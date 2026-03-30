@@ -1,0 +1,44 @@
+{
+  "name": "@parly/sdk",
+  "version": "16.9.9",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./lz-options": {
+      "types": "./dist/lz-options.d.ts",
+      "default": "./dist/lz-options.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "COMPATIBILITY.md",
+    "examples"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test:lz-options": "pnpm run build && node ./scripts/verify-lz-options.mjs",
+    "pack:dry-run": "pnpm publish --dry-run --no-git-checks"
+  },
+  "dependencies": {
+    "@parly/crypto-utils": "workspace:*",
+    "@parly/env-utils": "workspace:*",
+    "@parly/protocol-abis": "workspace:*",
+    "@parly/shared-types": "workspace:*",
+    "viem": "2.43.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.10",
+    "typescript": "5.8.2"
+  }
+}
