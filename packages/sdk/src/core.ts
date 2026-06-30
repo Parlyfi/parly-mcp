@@ -75,6 +75,19 @@ export type ExecutePaymentParams = {
   proofAssetsBasePath?: string
 }
 
+export type BatchPaymentOutput = {
+  destination: `0x${string}`
+  amount: string
+  destinationEid: number
+}
+
+export type ExecuteBatchPaymentParams = {
+  outputs: BatchPaymentOutput[]
+  assetId: 1 | 2
+  poolAddress: `0x${string}`
+  proofAssetsBasePath?: string
+}
+
 export type ParlyLaunchContext = ParlySDKConfig & {
   publicSurfaces: PublicSurfaceRecord[]
 }
@@ -487,22 +500,35 @@ export class ParlySDK {
     return { best, leaves, kp: keypair }
   }
 
-  async executeAgenticPayment(params: ExecutePaymentParams): Promise<ExecutePaymentOutcome> {
+  async executeAgenticPayment(params: ExecutePaymentParams | ExecuteBatchPaymentParams): Promise<ExecutePaymentOutcome> {
     let approvalToken: `0x${string}` | null = null
     let submittedHash: `0x${string}` | null = null
     let shouldCleanupApproval = false
     let finalHash: `0x${string}` | null = null
     let replacementReason: "replaced" | "repriced" | "cancelled" | null = null
+    let pendingRecordOutput: BatchPaymentOutput | null = null
     let activeNullifierHash =
       "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`
 
     try {
-      if (!isAddress(params.destination) || params.destination.toLowerCase() === ZERO_ADDRESS) {
-        throw new Error("Destination must be a non-zero address.")
-      }
       if (!isAddress(params.poolAddress) || params.poolAddress.toLowerCase() === ZERO_ADDRESS) {
         throw new Error("Pool address must be a non-zero address.")
       }
+
+      const outputs =
+        "outputs" in params
+          ? params.outputs
+          : [
+              {
+                destination: params.destination,
+                amount: params.amount,
+                destinationEid: params.destinationEid
+              }
+            ]
+      if (outputs.length < 1 || outputs.length > 10) {
+        throw new Error("Batch send supports 1 to 10 payout lanes.")
+      }
+      pendingRecordOutput = outputs[0] ?? null
 
       const { best, leaves, kp } = await this.recoverLargestNote(params.assetId, params.poolAddress)
       if (!best) {
@@ -537,12 +563,18 @@ export class ParlySDK {
       }
 
       const localEid = this.config.tempoLzEid
-      if (params.destinationEid !== localEid) {
-        throw new Error(
-          "Cross-chain routes are coming soon. Parly is launching first on Tempo for fast, private, stablecoin-native payments."
-        )
+      for (const output of outputs) {
+        if (!isAddress(output.destination) || output.destination.toLowerCase() === ZERO_ADDRESS) {
+          throw new Error("Destination must be a non-zero address.")
+        }
+        if (output.destinationEid !== localEid) {
+          throw new Error(
+            "Cross-chain private sends are not enabled in this SDK path. Use the public payment route APIs for supported cross-chain deposits."
+          )
+        }
       }
-      const amount = parseUnits(params.amount, 6)
+      const outputAmounts = outputs.map((output) => parseUnits(output.amount, 6))
+      const amount = outputAmounts.reduce((sum, value) => sum + value, 0n)
 
       const feeBps = (await this.publicClient.readContract({
         address: params.poolAddress,
@@ -589,9 +621,18 @@ export class ParlySDK {
         total_input_amount: best.payload.amount,
         asset_id: params.assetId.toString(),
         local_eid: String(localEid),
-        recipients: [BigInt(params.destination).toString(), ...Array(9).fill("0")],
-        amounts: [amount.toString(), ...Array(9).fill("0")],
-        dest_eids: [String(params.destinationEid), ...Array(9).fill(String(localEid))],
+        recipients: [
+          ...outputs.map((output) => BigInt(output.destination).toString()),
+          ...Array(10 - outputs.length).fill("0")
+        ],
+        amounts: [
+          ...outputAmounts.map((outputAmount) => outputAmount.toString()),
+          ...Array(10 - outputs.length).fill("0")
+        ],
+        dest_eids: [
+          ...outputs.map((output) => String(output.destinationEid)),
+          ...Array(10 - outputs.length).fill(String(localEid))
+        ],
         new_change_commitment: BigInt(newChangeCommitment).toString(),
         relayer: BigInt(this.account.address).toString(),
         secret: best.payload.secret,
@@ -651,9 +692,9 @@ export class ParlySDK {
           pB,
           pC,
           mappedSignals as any,
-          [params.destination, ...Array(9).fill(ZERO_ADDRESS)],
-          [amount, ...Array(9).fill(0n)],
-          [params.destinationEid, ...Array(9).fill(localEid)],
+          [...outputs.map((output) => output.destination), ...Array(10 - outputs.length).fill(ZERO_ADDRESS)],
+          [...outputAmounts, ...Array(10 - outputs.length).fill(0n)],
+          [...outputs.map((output) => output.destinationEid), ...Array(10 - outputs.length).fill(localEid)],
           newChangeCommitment,
           newChangeEnvelope,
           [option, ...Array(9).fill("0x")]
@@ -709,8 +750,8 @@ export class ParlySDK {
           submittedHash: finalHash || submittedHash,
           nullifierHash: activeNullifierHash,
           pool: params.poolAddress,
-          destination: params.destination,
-          destinationEid: params.destinationEid,
+          destination: pendingRecordOutput?.destination ?? ZERO_ADDRESS,
+          destinationEid: pendingRecordOutput?.destinationEid ?? this.config.tempoLzEid,
           assetId: params.assetId,
           approvalToken,
           approvalSpender: params.poolAddress,
@@ -752,6 +793,19 @@ export class ParlySDK {
       return {
         kind: "terminal_failure",
         message: "Payment params required."
+      }
+    }
+
+    return this.executeAgenticPayment(params)
+  }
+
+  async sendShieldedBatchPayment(
+    params?: ExecuteBatchPaymentParams
+  ): Promise<ExecutePaymentOutcome> {
+    if (!params) {
+      return {
+        kind: "terminal_failure",
+        message: "Batch payment params required."
       }
     }
 

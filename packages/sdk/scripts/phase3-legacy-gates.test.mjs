@@ -25,3 +25,9 @@ test("SDK MPP adapter exposes no-broadcast payment preflight", () => {
   const preflightBlock = mppSource.slice(mppSource.indexOf("preflightSessionPayment"))
   assert.doesNotMatch(preflightBlock, /executeAgenticPayment|writeContract|sendTransaction|fullProve/u)
 })
+
+test("SDK exposes a bounded 10-lane batch send wrapper", () => {
+  assert.match(coreSource, /sendShieldedBatchPayment/u)
+  assert.match(coreSource, /Batch send supports 1 to 10 payout lanes/u)
+  assert.match(coreSource, /Cross-chain private sends are not enabled/u)
+})

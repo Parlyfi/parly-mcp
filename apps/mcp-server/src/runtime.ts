@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import {
   ParlyMppAdapter,
   ParlySDK,
+  type ExecuteBatchPaymentParams,
   type ExecutePaymentParams,
   type ExecutePaymentOutcome,
   type MppSessionRecord,
@@ -18,6 +19,8 @@ const MCP_SUPPORTED_TOOLS = [
   "recover_largest_note",
   "preflight_shielded_payment",
   "send_shielded_payment",
+  "preflight_batch_shielded_payment",
+  "send_batch_shielded_payment",
   "execute_shielded_payment",
   "mpp_create_session",
   "mpp_preflight_session_payment",
@@ -35,20 +38,15 @@ const MCP_WEB_API_TOOLS = [
   "payment_one_time_deposit_create",
   "payment_wallet_deposit_quote",
   "payment_status_read",
+  "payer_history_read",
   "payout_status_read",
   "refund_claim",
+  "receipt_download_url",
   "verify_invoice_receipt",
+  "ui_settings_read",
   "relayer_list",
   "relayer_register_init",
-  "relayer_register_confirm",
-  "admin_operations_summary",
-  "admin_reports_list",
-  "admin_reserved_names_list",
-  "admin_payout_queue",
-  "admin_operations_action",
-  "admin_ui_settings",
-  "telegram_status",
-  "telegram_disconnect"
+  "relayer_register_confirm"
 ] as const
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -83,6 +81,18 @@ const shieldedPaymentSchema = z.object({
   amount: amountSchema,
   assetId: assetIdSchema,
   destinationEid: z.number().int().positive(),
+  poolAddress: addressSchema,
+  proofAssetsBasePath: z.string().min(1).optional()
+})
+const batchShieldedPaymentSchema = z.object({
+  outputs: z.array(
+    z.object({
+      destination: addressSchema,
+      amount: amountSchema,
+      destinationEid: z.number().int().positive()
+    })
+  ).min(1).max(10),
+  assetId: assetIdSchema,
   poolAddress: addressSchema,
   proofAssetsBasePath: z.string().min(1).optional()
 })
@@ -178,6 +188,23 @@ function summarizeOutcome(outcome: ExecutePaymentOutcome) {
   }
 }
 
+function preflightRouteMode(destinationEids: number[], settlementDomainId: number) {
+  const unsupported = destinationEids.filter((destinationEid) => destinationEid !== settlementDomainId)
+  if (unsupported.length > 0) {
+    return {
+      ok: false,
+      routeMode: "unsupported-cross-chain-private-send",
+      message:
+        "Cross-chain private sends are not enabled in this SDK path. Use public payment route APIs for supported cross-chain deposits."
+    }
+  }
+
+  return {
+    ok: true,
+    routeMode: "same-chain"
+  }
+}
+
 export type ParlyMcpRuntime = {
   config: McpRuntimeConfig
   sdk: ParlySDK
@@ -208,8 +235,7 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
       : null
   const webApi = config.webApiBaseUrl
     ? new ParlyWebApiClient(config.webApiBaseUrl, {
-        bearerToken: config.webApiBearerToken,
-        cookieHeader: config.webApiCookieHeader
+        bearerToken: config.webApiBearerToken
       })
     : null
 
@@ -393,11 +419,7 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
         status: "ok",
         tool: "preflight_shielded_payment",
         preflight: {
-          ok: true,
-          routeMode:
-            args.destinationEid === config.settlementDomainId
-              ? "same-chain"
-              : "cross-chain-alt-fee-token-only",
+          ...preflightRouteMode([args.destinationEid], config.settlementDomainId),
           settlementChainId: config.tempoChainId,
           settlementEid: config.settlementDomainId,
           assetId: args.assetId,
@@ -418,6 +440,61 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
       inputSchema: shieldedPaymentSchema
     },
     async (args) => handleShieldedPaymentTool("send_shielded_payment", args)
+  )
+
+  registerTool(
+    "preflight_batch_shielded_payment",
+    {
+      title: "Preflight Batch Shielded Payment",
+      description:
+        "Validate up to 10 shielded payment lanes before proof generation or transaction submission.",
+      inputSchema: batchShieldedPaymentSchema
+    },
+    async (args) =>
+      jsonToolResponse({
+        status: "ok",
+        tool: "preflight_batch_shielded_payment",
+        preflight: {
+          ...preflightRouteMode(
+            (args.outputs as Array<{ destinationEid: number }>).map((output) => output.destinationEid),
+            config.settlementDomainId
+          ),
+          settlementChainId: config.tempoChainId,
+          settlementEid: config.settlementDomainId,
+          assetId: args.assetId,
+          poolAddress: args.poolAddress,
+          outputCount: args.outputs.length,
+          outputs: args.outputs
+        }
+      })
+  )
+
+  registerTool(
+    "send_batch_shielded_payment",
+    {
+      title: "Send Batch Shielded Payment",
+      description:
+        "Send up to 10 same-chain private payment lanes from the AGENT wallet's largest live Parly note.",
+      inputSchema: batchShieldedPaymentSchema
+    },
+    async (args) => {
+      try {
+        const outcome = await sdk.sendShieldedBatchPayment(args as ExecuteBatchPaymentParams)
+        return jsonToolResponse({
+          status: "ok",
+          tool: "send_batch_shielded_payment",
+          routeMode: "same-chain",
+          settlementChainId: config.tempoChainId,
+          settlementEid: config.settlementDomainId,
+          assetId: args.assetId,
+          poolAddress: args.poolAddress,
+          outputCount: args.outputs.length,
+          outcome: summarizeOutcome(outcome)
+        })
+      } catch (error) {
+        return jsonToolError("send_batch_shielded_payment", error)
+      }
+    }
   )
 
   registerTool(
@@ -582,7 +659,7 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
   }, { method: "POST", path: "/api/phase3/privacy-links/report" })
   registerWebApiTool("privacy_link_social_status", {
     title: "Privacy Link Social Status",
-    description: "Read linked X and Telegram status for the current Privacy Links web session."
+    description: "Read linked social status for the current Privacy Links owner flow."
   }, { method: "GET", path: "/api/phase3/privacy-links/social-status" })
   registerWebApiTool("payment_one_time_deposit_create", {
     title: "Create One-Time Deposit",
@@ -596,6 +673,10 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
     title: "Read Payment Status",
     description: "Read a one-time or wallet payment status using the public status token flow."
   }, { method: "POST", path: "/api/phase3/payment-status" })
+  registerWebApiTool("payer_history_read", {
+    title: "Read Payer History",
+    description: "Read payer-authorized Privacy Links payment history using the refund-wallet recovery proof."
+  }, { method: "POST", path: "/api/phase3/payer-history" })
   registerWebApiTool("payout_status_read", {
     title: "Read Payout Status",
     description: "Read public payout lifecycle status without exposing unrelated private lanes."
@@ -604,10 +685,18 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
     title: "Claim Failed-Payment Refund",
     description: "Submit a claimant-bound refund request through the existing refund API."
   }, { method: "POST", path: "/api/phase3/refund-claim" })
+  registerWebApiTool("receipt_download_url", {
+    title: "Create Receipt Download URL",
+    description: "Create a short-lived private receipt download URL from a status access token."
+  }, { method: "POST", path: "/api/phase3/receipt-download" })
   registerWebApiTool("verify_invoice_receipt", {
     title: "Verify Invoice Receipt",
     description: "Verify a Privacy Invoice receipt token through the public Verify API."
   }, { method: "POST", path: "/api/verify/invoice" })
+  registerWebApiTool("ui_settings_read", {
+    title: "Read Public UI Settings",
+    description: "Read public presentation settings such as the TVL ticker state."
+  }, { method: "GET", path: "/api/phase3/ui-settings" })
   registerWebApiTool("relayer_list", {
     title: "List Relayers",
     description: "Read the public relayer registry snapshot."
@@ -620,39 +709,6 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
     title: "Confirm Relayer Registration",
     description: "Confirm a relayer registration using the same signed API as /relayer."
   }, { method: "POST", path: "/api/relayers/register/confirm" })
-  registerWebApiTool("admin_operations_summary", {
-    title: "Admin Operations Summary",
-    description: "Read operations metrics through the existing admin session-gated API."
-  }, { method: "GET", path: "/api/phase3/admin/operations-summary" })
-  registerWebApiTool("admin_reports_list", {
-    title: "Admin Reports",
-    description: "Read Privacy Links reports through the existing admin session-gated API."
-  }, { method: "GET", path: "/api/phase3/admin/reports" })
-  registerWebApiTool("admin_reserved_names_list", {
-    title: "Admin Reserved Names",
-    description: "Read active reserved names through the existing admin session-gated API."
-  }, { method: "GET", path: "/api/phase3/admin/reserved-names" })
-  registerWebApiTool("admin_payout_queue", {
-    title: "Admin Payout Queue",
-    description: "Read payout queue state through the existing admin session-gated API."
-  }, { method: "GET", path: "/api/phase3/admin/payout-queue" })
-  registerWebApiTool("admin_operations_action", {
-    title: "Admin Operations Action",
-    description: "Submit signed operations workflow actions through the existing admin audit API."
-  }, { method: "POST", path: "/api/phase3/admin/operations-action" })
-  registerWebApiTool("admin_ui_settings", {
-    title: "Admin UI Settings",
-    description: "Read or update admin-controlled UI settings through the existing admin API."
-  }, { method: "GET", path: "/api/phase3/admin/ui-settings" })
-  registerWebApiTool("telegram_status", {
-    title: "Telegram Status",
-    description: "Read Telegram connection status for the current web session."
-  }, { method: "GET", path: "/api/telegram/status" })
-  registerWebApiTool("telegram_disconnect", {
-    title: "Disconnect Telegram",
-    description: "Disconnect Telegram notifications through the existing web session API."
-  }, { method: "POST", path: "/api/telegram/disconnect" })
-
   return {
     config,
     sdk,

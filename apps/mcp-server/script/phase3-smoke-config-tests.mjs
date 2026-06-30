@@ -17,7 +17,7 @@ test("MCP smoke config requires explicit Phase 3 selection", () => {
   assert.match(source, /phase3-tempo4217/u)
   assert.match(source, /legacy-moderato-v1/u)
   assert.match(source, /PARLY_WEB_API_BASE_URL/u)
-  assert.match(source, /PARLY_MCP_WEB_API_COOKIE/u)
+  assert.doesNotMatch(source, /PARLY_MCP_WEB_API_COOKIE/u)
 })
 
 test("MCP exposes a no-broadcast MPP preflight before settlement", () => {
@@ -30,6 +30,7 @@ test("MCP exposes a no-broadcast MPP preflight before settlement", () => {
 
 test("MCP exposes shielded payment preflight without proof or transaction submission", () => {
   assert.match(runtimeSource, /preflight_shielded_payment/u)
+  assert.match(runtimeSource, /preflight_batch_shielded_payment/u)
   assert.match(runtimeSource, /before proof generation or transaction submission/u)
   const preflightBlock = runtimeSource.match(/"preflight_shielded_payment"[\s\S]*?"send_shielded_payment"/u)?.[0] ?? ""
   assert.doesNotMatch(preflightBlock, /sendShieldedPayment|executeAgenticPayment|writeContract|sendTransaction|fullProve/u)
@@ -37,18 +38,29 @@ test("MCP exposes shielded payment preflight without proof or transaction submis
 
 test("MCP exposes Send naming while keeping the legacy execute alias", () => {
   assert.match(runtimeSource, /send_shielded_payment/u)
+  assert.match(runtimeSource, /send_batch_shielded_payment/u)
   assert.match(runtimeSource, /execute_shielded_payment/u)
   assert.match(runtimeSource, /Compatibility alias for send_shielded_payment/u)
   assert.match(runtimeSource, /sdk\.sendShieldedPayment/u)
   assert.match(runtimeSource, /MCP_SUPPORTED_TOOLS\.slice\(0, 4\)/u)
 })
 
+test("MCP public surface does not expose admin or treasury controls", () => {
+  assert.doesNotMatch(runtimeSource, /admin_/u)
+  assert.doesNotMatch(runtimeSource, /treasury_/u)
+  assert.doesNotMatch(runtimeSource, /signer_rotation|route_control|payout_execution/u)
+  assert.doesNotMatch(runtimeSource, /PARLY_MCP_WEB_API_COOKIE/u)
+})
+
 test("MCP web API tools are named Parly routes, not an arbitrary proxy", () => {
   assert.match(runtimeSource, /MCP_WEB_API_TOOLS/u)
   assert.match(runtimeSource, /privacy_link_publish/u)
   assert.match(runtimeSource, /payment_one_time_deposit_create/u)
+  assert.match(runtimeSource, /payer_history_read/u)
+  assert.match(runtimeSource, /receipt_download_url/u)
   assert.match(runtimeSource, /verify_invoice_receipt/u)
-  assert.match(runtimeSource, /admin_operations_summary/u)
+  assert.match(runtimeSource, /ui_settings_read/u)
   assert.match(runtimeSource, /PARLY_WEB_API_BASE_URL|webApiEnabled/u)
+  assert.doesNotMatch(runtimeSource, /admin_operations_summary|admin_operations_action/u)
   assert.doesNotMatch(runtimeSource, /path:\s*z\.string|url:\s*z\.string/u)
 })

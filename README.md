@@ -34,7 +34,7 @@ By default the server runs over stdio. Set `PORT` to run the same MCP surface ov
 - `PARLY_SDK_ASSETS_PATH`
 - optional MPP adapter flags
 - optional app API bridge: `PARLY_WEB_API_BASE_URL`
-- optional app API auth: `PARLY_MCP_WEB_API_BEARER_TOKEN` or `PARLY_MCP_WEB_API_COOKIE`
+- optional app API auth: `PARLY_MCP_WEB_API_BEARER_TOKEN`
 
 Public exports intentionally omit proving keys. Configure `PARLY_SDK_ASSETS_PATH` if your proof
 assets live outside the package tree.
@@ -46,6 +46,8 @@ Private balance tools:
 - `recover_largest_note`
 - `preflight_shielded_payment`
 - `send_shielded_payment`
+- `preflight_batch_shielded_payment`
+- `send_batch_shielded_payment`
 - `execute_shielded_payment`
 
 MPP tools:
@@ -57,9 +59,9 @@ MPP tools:
 App API tools, when `PARLY_WEB_API_BASE_URL` is configured:
 
 - Privacy Links status, public read, owner list, claim, publish, visibility, reports, and social status
-- payment route creation or quote, payment status, payout status, refund claim, and invoice receipt verification
+- cross-chain deposit route creation or quote, payment status, payer history, payout status, refund
+  claim, short-lived receipt download URLs, and invoice receipt verification
 - public relayer list and relayer registration helpers
-- admin operations summary, reports, reserved names, payout queue, operations actions, UI settings, and Telegram status
 
 `execute_shielded_payment` is a compatibility alias. New integrations should use
 `send_shielded_payment`.
@@ -73,8 +75,13 @@ App API tools, when `PARLY_WEB_API_BASE_URL` is configured:
 
 - MCP uses AGENT key authority only.
 - Relayer keys do not belong in this project.
-- Privacy Links, Verify, Ledger, relayer registration, Telegram, and admin operations are web/API
-  product surfaces. MCP can call those APIs when configured, but it does not bypass their wallet
-  signatures, admin sessions, rate limits, 403 policy checks, or audit history.
+- Privacy Links, Verify, payment routes, and relayer registration are public web/API product
+  surfaces. MCP can call those APIs when configured, but it does not bypass wallet signatures,
+  rate limits, 403 policy checks, or audit history.
+- Admin, treasury, signer rotation, route-control, pause, payout-execution, and moderation tools
+  are intentionally not exposed by the public MCP package.
+- Batch private sends are same-chain in the SDK/MCP path. Cross-chain deposits use the public
+  payment-route APIs. Cross-chain private sends require a dedicated public payout route before they
+  are added to MCP.
 - MPP support stays at the SDK/MCP boundary.
 - Preflight tools do not generate proofs, request signatures, or submit transactions.

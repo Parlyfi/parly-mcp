@@ -5,7 +5,6 @@ export class ParlyWebApiClient {
     private readonly baseUrl: string,
     private readonly auth: {
       bearerToken?: string
-      cookieHeader?: string
     } = {}
   ) {}
 
@@ -27,8 +26,7 @@ export class ParlyWebApiClient {
       headers: {
         accept: "application/json",
         "content-type": "application/json",
-        ...(this.auth.bearerToken ? { authorization: `Bearer ${this.auth.bearerToken}` } : {}),
-        ...(this.auth.cookieHeader ? { cookie: this.auth.cookieHeader } : {})
+        ...(this.auth.bearerToken ? { authorization: `Bearer ${this.auth.bearerToken}` } : {})
       },
       body: body === undefined ? undefined : JSON.stringify(body)
     })

@@ -5,6 +5,8 @@
 - AGENT key model only
 - settlement domain: Tempo `4217`
 - supported transports: stdio, HTTP `/mcp` when `PORT` is set
-- app product surfaces such as Privacy Links, Verify, Ledger, relayer registration, Telegram, and
-  admin operations require `PARLY_WEB_API_BASE_URL`
-- admin routes still require the same admin session or signed workflow authorization as the web app
+- public app surfaces such as Privacy Links, cross-chain deposit payment routes, Verify, payer
+  history, receipt downloads, and relayer registration require `PARLY_WEB_API_BASE_URL`
+- batch private sends support 1 to 10 same-chain payout lanes
+- admin, treasury, signer rotation, route-control, payout execution, and moderation tools are not
+  exposed by the public MCP package

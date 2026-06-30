@@ -19,7 +19,6 @@ export type McpRuntimeConfig = {
   mppServiceVersion?: string
   webApiBaseUrl?: string
   webApiBearerToken?: string
-  webApiCookieHeader?: string
 }
 
 function requirePrivateKey(name: string, env: NodeJS.ProcessEnv): `0x${string}` {
@@ -89,8 +88,7 @@ export function assertMcpConfig(env: NodeJS.ProcessEnv = process.env): McpRuntim
     proofAssetsBasePath: env.PARLY_SDK_ASSETS_PATH,
     enableMppAdapter: enableMppAdapter === "true",
     webApiBaseUrl: normalizeWebApiBaseUrl(env.PARLY_WEB_API_BASE_URL),
-    webApiBearerToken: env.PARLY_MCP_WEB_API_BEARER_TOKEN,
-    webApiCookieHeader: env.PARLY_MCP_WEB_API_COOKIE
+    webApiBearerToken: env.PARLY_MCP_WEB_API_BEARER_TOKEN
   }
 
   if (config.enableMppAdapter) {
@@ -120,8 +118,7 @@ if (process.argv[1] && process.argv[1].endsWith("smoke-config.js")) {
         mppServiceName: config.mppServiceName ?? null,
         mppServiceVersion: config.mppServiceVersion ?? null,
         webApiBaseUrlConfigured: Boolean(config.webApiBaseUrl),
-        webApiBearerTokenConfigured: Boolean(config.webApiBearerToken),
-        webApiCookieConfigured: Boolean(config.webApiCookieHeader)
+        webApiBearerTokenConfigured: Boolean(config.webApiBearerToken)
       },
       null,
       2

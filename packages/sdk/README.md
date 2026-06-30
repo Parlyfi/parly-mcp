@@ -13,6 +13,7 @@ Parly private balance. It supports the two Phase 3 asset lanes:
 - `ParlySDK.fromEnv()` creates an SDK client from server-side environment variables.
 - `recoverLargestNote(assetId, poolAddress)` finds the largest live note for an asset lane.
 - `sendShieldedPayment(params)` sends from a recovered private note.
+- `sendShieldedBatchPayment(params)` sends up to 10 same-chain private payout lanes from one note.
 - `executeShieldedPayment(params)` remains as a compatibility alias for older integrations.
 - `ParlyMppAdapter` adds MPP session creation, preflight, and settlement helpers at the SDK boundary.
 
@@ -39,6 +40,9 @@ Use server-only variables for SDK execution:
 
 Provider credentials, Relay keys, and private keys must stay server-side. Do not expose them through
 `NEXT_PUBLIC_*` variables.
+
+Cross-chain deposits are served by the Parly payment-route APIs. Cross-chain private sends are not
+enabled in this SDK path until the dedicated payout route is exposed through the public API.
 
 ## Proof assets
 
