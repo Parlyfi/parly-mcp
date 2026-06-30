@@ -1,4 +1,15 @@
-import { resolveTempoSettlementEid } from "../dist/lz-options.js"
+import { existsSync } from "node:fs"
+
+const emittedCandidates = [
+  new URL("../dist/lz-options.js", import.meta.url),
+  new URL("../dist/sdk/src/lz-options.js", import.meta.url)
+]
+const emitted = emittedCandidates.find((candidate) => existsSync(candidate))
+if (!emitted) {
+  throw new Error("Unable to locate built lz-options helper in SDK dist output.")
+}
+
+const { resolveTempoSettlementEid } = await import(emitted.href)
 
 const valid = resolveTempoSettlementEid("4217")
 if (valid !== 4217) {

@@ -8,11 +8,19 @@ function requireValue(name: string): string {
   return value
 }
 
-const sdk = new ParlySDK({
-  privateKeyHex: requireValue("AGENT_PRIVATE_KEY") as `0x${string}`,
-  tempoRpcUrl: requireValue("TEMPO_RPC_URL"),
-  tempoChainId: Number(requireValue("TEMPO_CHAIN_ID")),
-  tempoLzEid: Number(requireValue("TEMPO_LZ_EID"))
-})
+async function main() {
+  const sdk = ParlySDK.fromEnv()
 
-console.log(sdk.describe())
+  const outcome = await sdk.sendShieldedPayment({
+    destination: requireValue("PARLY_EXAMPLE_DESTINATION") as `0x${string}`,
+    amount: requireValue("PARLY_EXAMPLE_AMOUNT"),
+    assetId: Number(requireValue("PARLY_EXAMPLE_ASSET_ID")) as 1 | 2,
+    destinationEid: Number(requireValue("PARLY_EXAMPLE_DESTINATION_EID")),
+    poolAddress: requireValue("PARLY_EXAMPLE_POOL_ADDRESS") as `0x${string}`
+  })
+
+  console.log(sdk.describe())
+  console.log(outcome)
+}
+
+void main()

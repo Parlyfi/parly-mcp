@@ -18,6 +18,7 @@
   },
   "files": [
     "dist",
+    "assets",
     "README.md",
     "CHANGELOG.md",
     "COMPATIBILITY.md",
@@ -27,7 +28,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
+    "sync:proof-assets": "node ./scripts/sync-proof-assets.mjs",
     "test:lz-options": "pnpm run build && node ./scripts/verify-lz-options.mjs",
+    "test:phase3-legacy-gates": "node --test scripts/phase3-legacy-gates.test.mjs",
     "pack:dry-run": "pnpm publish --dry-run --no-git-checks"
   },
   "dependencies": {
@@ -35,6 +38,11 @@
     "@parly/env-utils": "workspace:*",
     "@parly/protocol-abis": "workspace:*",
     "@parly/shared-types": "workspace:*",
+    "@layerzerolabs/lz-v2-utilities": "3.0.167",
+    "circomlibjs": "0.1.7",
+    "fixed-merkle-tree": "0.7.3",
+    "libsodium-wrappers-sumo": "^0.7.13",
+    "snarkjs": "0.7.4",
     "viem": "2.43.5"
   },
   "devDependencies": {

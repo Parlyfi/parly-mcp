@@ -15,6 +15,7 @@
   "files": ["dist", "package.json"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test:phase3": "pnpm run build && node --test scripts/phase3-abis.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
