@@ -1,4 +1,7 @@
 export * from "./core.js"
+export * from "./recovery-keys.js"
+export * from "./note-crypto.js"
+export * from "./erc20.js"
 export * from "./indexer.js"
 export * from "./lz-options.js"
 export * from "./mpp.js"

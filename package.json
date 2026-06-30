@@ -8,7 +8,8 @@
     "typecheck": "pnpm -r --if-present run typecheck",
     "start": "pnpm --filter @parly/mcp-server run start",
     "smoke:config": "pnpm --filter @parly/mcp-server run smoke:config",
-    "smoke:standalone": "pnpm lint && pnpm typecheck && pnpm build && pnpm smoke:config"
+    "smoke:tools": "pnpm --filter @parly/mcp-server run smoke:tools",
+    "smoke:standalone": "pnpm lint && pnpm typecheck && pnpm build && pnpm smoke:config && pnpm smoke:tools"
   },
   "engines": {
     "node": ">=22"

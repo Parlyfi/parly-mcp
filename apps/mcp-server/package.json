@@ -3,16 +3,21 @@
   "version": "16.9.9-mcp.0",
   "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build:deps": "pnpm --filter @parly/env-utils run build && pnpm --filter @parly/shared-types run build && pnpm --filter @parly/protocol-abis run build && pnpm --filter @parly/crypto-utils run build && pnpm --filter @parly/sdk run build",
+    "build": "pnpm run build:deps && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "start": "node dist/apps/mcp-server/src/index.js",
-    "smoke:config": "node dist/apps/mcp-server/src/smoke-config.js"
+    "start": "pnpm run build && node ./script/sync-workspace-dist.mjs && node dist/apps/mcp-server/src/index.js",
+    "smoke:config": "node dist/apps/mcp-server/src/smoke-config.js",
+    "smoke:tools": "node dist/apps/mcp-server/src/smoke-tools.js",
+    "test:phase3-smoke-config": "pnpm run build && node --test script/phase3-smoke-config-tests.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@parly/env-utils": "workspace:*",
     "@parly/sdk": "workspace:*",
-    "dotenv": "16.4.7"
+    "dotenv": "16.4.7",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/node": "22.13.10",
