@@ -78,8 +78,8 @@ App API tools, when `PARLY_WEB_API_BASE_URL` is configured:
 - Privacy Links, Verify, payment routes, and relayer registration are public web/API product
   surfaces. MCP can call those APIs when configured, but it does not bypass wallet signatures,
   rate limits, 403 policy checks, or audit history.
-- Admin, treasury, signer rotation, route-control, pause, payout-execution, and moderation tools
-  are intentionally not exposed by the public MCP package.
+- This package exposes user, payer, and relayer-facing payment flows. Operational controls stay in
+  Parly's governed product surfaces.
 - Batch private sends are same-chain in the SDK/MCP path. Cross-chain deposits use the public
   payment-route APIs. Cross-chain private sends require a dedicated public payout route before they
   are added to MCP.

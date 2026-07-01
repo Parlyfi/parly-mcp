@@ -9,14 +9,13 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "baseUrl": ".",
     "types": ["node"],
     "paths": {
-      "@parly/env-utils": ["packages/env-utils/src/index.ts"],
-      "@parly/protocol-abis": ["packages/protocol-abis/src/index.ts"],
-      "@parly/shared-types": ["packages/shared-types/src/index.ts"],
-      "@parly/crypto-utils": ["packages/crypto-utils/src/index.ts"],
-      "@parly/sdk": ["packages/sdk/src/index.ts"]
+      "@parly/env-utils": ["./packages/env-utils/src/index.ts"],
+      "@parly/protocol-abis": ["./packages/protocol-abis/src/index.ts"],
+      "@parly/shared-types": ["./packages/shared-types/src/index.ts"],
+      "@parly/crypto-utils": ["./packages/crypto-utils/src/index.ts"],
+      "@parly/sdk": ["./packages/sdk/src/index.ts"]
     }
   }
 }

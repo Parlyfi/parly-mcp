@@ -5,6 +5,14 @@ import test from "node:test"
 const coreSource = readFileSync(new URL("../src/core.ts", import.meta.url), "utf8")
 const lzOptionsSource = readFileSync(new URL("../src/lz-options.ts", import.meta.url), "utf8")
 const mppSource = readFileSync(new URL("../src/mpp.ts", import.meta.url), "utf8")
+const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8")
+const publicApiSource = (() => {
+  try {
+    return readFileSync(new URL("../src/public-api.ts", import.meta.url), "utf8")
+  } catch {
+    return ""
+  }
+})()
 
 test("SDK Phase 3 env path requires settlement-domain names instead of LayerZero EID aliases", () => {
   const fromEnvBody = coreSource.match(/static fromEnv[\s\S]*?\n  getLaunchContext/u)?.[0] ?? ""
@@ -30,4 +38,64 @@ test("SDK exposes a bounded 10-lane batch send wrapper", () => {
   assert.match(coreSource, /sendShieldedBatchPayment/u)
   assert.match(coreSource, /Batch send supports 1 to 10 payout lanes/u)
   assert.match(coreSource, /Cross-chain private sends are not enabled/u)
+})
+
+test("SDK exposes public Privacy Links create and edit helpers without admin controls", () => {
+  assert.match(indexSource, /public-api\.js/u)
+  for (const symbol of [
+    "ParlyPublicApiClient",
+    "CreateProfileLinkInput",
+    "CreateInvoiceLinkInput",
+    "EditProfileLinkInput",
+    "EditInvoiceLinkInput"
+  ]) {
+    assert.match(publicApiSource, new RegExp(symbol, "u"))
+  }
+  for (const method of ["createProfileLink", "editProfileLink", "createInvoiceLink", "editInvoiceLink"]) {
+    assert.match(publicApiSource, new RegExp(`${method}\\(`, "u"))
+  }
+  assert.match(publicApiSource, /\/api\/phase3\/privacy-links\/publish/u)
+  assert.match(publicApiSource, /owner wallet signature/u)
+  assert.doesNotMatch(publicApiSource, /admin|treasury|signerRotation|routeControl|campaignAward/u)
+})
+
+test("SDK public API client exposes product methods, not arbitrary HTTP primitives", () => {
+  assert.doesNotMatch(publicApiSource, /\n  async get</u)
+  assert.doesNotMatch(publicApiSource, /\n  async post</u)
+  for (const method of [
+    "claimPrivacyLinkName",
+    "listOwnedPrivacyLinks",
+    "updatePrivacyLinkVisibility",
+    "reportPrivacyLink",
+    "createPrivacyImageUploadUrl",
+    "prepareProfilePayment",
+    "prepareInvoicePayment",
+    "createProfileOneTimeAddress",
+    "createInvoiceOneTimeAddress",
+    "readPaymentStatus",
+    "readPayerHistory",
+    "readPayoutStatus",
+    "claimRefund",
+    "createReceiptDownloadUrl",
+    "verifyPayoutScope",
+    "startRelayerRegistration",
+    "confirmRelayerRegistration",
+    "parseBatchCsv"
+  ]) {
+    assert.match(publicApiSource, new RegExp(`${method}\\(`, "u"))
+  }
+  for (const path of [
+    "/api/phase3/privacy-links/claim",
+    "/api/phase3/privacy-links/owned",
+    "/api/phase3/privacy-links/status",
+    "/api/phase3/privacy-links/report",
+    "/api/phase3/privacy-links/image-upload",
+    "/api/phase3/payment-status",
+    "/api/phase3/payout-status",
+    "/api/phase3/refund-claim",
+    "/api/relayers/register/init",
+    "/api/relayers/register/confirm"
+  ]) {
+    assert.match(publicApiSource, new RegExp(path.replaceAll("/", "\\/"), "u"))
+  }
 })

@@ -42,7 +42,7 @@ test("MCP exposes Send naming while keeping the legacy execute alias", () => {
   assert.match(runtimeSource, /execute_shielded_payment/u)
   assert.match(runtimeSource, /Compatibility alias for send_shielded_payment/u)
   assert.match(runtimeSource, /sdk\.sendShieldedPayment/u)
-  assert.match(runtimeSource, /MCP_SUPPORTED_TOOLS\.slice\(0, 4\)/u)
+  assert.match(runtimeSource, /MCP_SUPPORTED_TOOLS\.filter\(\(tool\) => !tool\.startsWith\("mpp_"\)\)/u)
 })
 
 test("MCP public surface does not expose admin or treasury controls", () => {
@@ -54,6 +54,10 @@ test("MCP public surface does not expose admin or treasury controls", () => {
 
 test("MCP web API tools are named Parly routes, not an arbitrary proxy", () => {
   assert.match(runtimeSource, /MCP_WEB_API_TOOLS/u)
+  assert.match(runtimeSource, /create_profile_link/u)
+  assert.match(runtimeSource, /edit_profile_link/u)
+  assert.match(runtimeSource, /create_invoice_link/u)
+  assert.match(runtimeSource, /edit_invoice_link/u)
   assert.match(runtimeSource, /privacy_link_publish/u)
   assert.match(runtimeSource, /payment_one_time_deposit_create/u)
   assert.match(runtimeSource, /payer_history_read/u)
@@ -63,4 +67,31 @@ test("MCP web API tools are named Parly routes, not an arbitrary proxy", () => {
   assert.match(runtimeSource, /PARLY_WEB_API_BASE_URL|webApiEnabled/u)
   assert.doesNotMatch(runtimeSource, /admin_operations_summary|admin_operations_action/u)
   assert.doesNotMatch(runtimeSource, /path:\s*z\.string|url:\s*z\.string/u)
+})
+
+test("MCP Privacy Link create and edit tools use the owner-signed publish API", () => {
+  for (const tool of ["create_profile_link", "edit_profile_link", "create_invoice_link", "edit_invoice_link"]) {
+    assert.match(runtimeSource, new RegExp(`registerWebApiTool\\("${tool}"`, "u"))
+  }
+  assert.match(runtimeSource, /Create Profile Link/u)
+  assert.match(runtimeSource, /Edit Profile Link/u)
+  assert.match(runtimeSource, /Create Invoice Link/u)
+  assert.match(runtimeSource, /Edit Invoice Link/u)
+  assert.match(runtimeSource, /owner wallet signature/u)
+  assert.doesNotMatch(runtimeSource, /admin_|treasury_|signer_rotation|route_control/u)
+})
+
+test("public MCP exposes product payment verbs without admin controls", () => {
+  for (const name of [
+    "prepare_profile_payment",
+    "prepare_invoice_payment",
+    "create_profile_one_time_address",
+    "create_invoice_one_time_address",
+    "verify_payout_scope",
+    "download_receipt_url",
+    "parse_batch_csv"
+  ]) {
+    assert.match(runtimeSource, new RegExp(`"${name}"`, "u"))
+  }
+  assert.doesNotMatch(runtimeSource, /admin_|treasury_|signer_rotation|route_control|campaign_award/u)
 })

@@ -31,6 +31,14 @@ const MCP_WEB_API_TOOLS = [
   "privacy_link_public_read",
   "privacy_link_owned_list",
   "privacy_link_claim",
+  "create_profile_link",
+  "edit_profile_link",
+  "create_invoice_link",
+  "edit_invoice_link",
+  "prepare_profile_payment",
+  "prepare_invoice_payment",
+  "create_profile_one_time_address",
+  "create_invoice_one_time_address",
   "privacy_link_publish",
   "privacy_link_visibility",
   "privacy_link_report",
@@ -42,7 +50,9 @@ const MCP_WEB_API_TOOLS = [
   "payout_status_read",
   "refund_claim",
   "receipt_download_url",
+  "download_receipt_url",
   "verify_invoice_receipt",
+  "verify_payout_scope",
   "ui_settings_read",
   "relayer_list",
   "relayer_register_init",
@@ -101,6 +111,9 @@ const webApiGetSchema = z.object({
 })
 const webApiPostSchema = z.object({
   body: z.record(z.unknown()).optional()
+})
+const batchCsvSchema = z.object({
+  csv: z.string().min(1)
 })
 
 function normalizeError(error: unknown) {
@@ -288,7 +301,7 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
     () => ({
       ...sdk.getLaunchContext(),
       mcpVersion: MCP_VERSION,
-      supportedTools: adapter ? [...MCP_SUPPORTED_TOOLS] : MCP_SUPPORTED_TOOLS.slice(0, 4),
+      supportedTools: adapter ? [...MCP_SUPPORTED_TOOLS] : MCP_SUPPORTED_TOOLS.filter((tool) => !tool.startsWith("mpp_")),
       webApiTools: webApi ? [...MCP_WEB_API_TOOLS] : [],
       verificationModel: "lane-scoped selective disclosure",
       mppAdapterEnabled: Boolean(adapter),
@@ -645,6 +658,38 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
     title: "Claim Privacy Link Name",
     description: "Claim a Privacy Link name using the same owner wallet signature required by the web app."
   }, { method: "POST", path: "/api/phase3/privacy-links/claim" })
+  registerWebApiTool("create_profile_link", {
+    title: "Create Profile Link",
+    description: "Create a Parly Profile link through the owner wallet signature publish API."
+  }, { method: "POST", path: "/api/phase3/privacy-links/publish" })
+  registerWebApiTool("edit_profile_link", {
+    title: "Edit Profile Link",
+    description: "Edit a Parly Profile link by republishing metadata through the owner wallet signature publish API."
+  }, { method: "POST", path: "/api/phase3/privacy-links/publish" })
+  registerWebApiTool("create_invoice_link", {
+    title: "Create Invoice Link",
+    description: "Create a Parly invoice link through the owner wallet signature publish API."
+  }, { method: "POST", path: "/api/phase3/privacy-links/publish" })
+  registerWebApiTool("edit_invoice_link", {
+    title: "Edit Invoice Link",
+    description: "Edit a Parly invoice link by republishing metadata through the owner wallet signature publish API."
+  }, { method: "POST", path: "/api/phase3/privacy-links/publish" })
+  registerWebApiTool("prepare_profile_payment", {
+    title: "Prepare Profile Payment",
+    description: "Prepare a connected-wallet payment route for a Parly Profile link."
+  }, { method: "POST", path: "/api/phase3/wallet-deposit" })
+  registerWebApiTool("prepare_invoice_payment", {
+    title: "Prepare Invoice Payment",
+    description: "Prepare a connected-wallet payment route for a Parly invoice link."
+  }, { method: "POST", path: "/api/phase3/wallet-deposit" })
+  registerWebApiTool("create_profile_one_time_address", {
+    title: "Create Profile One-Time Address",
+    description: "Create a one-time payment address for a Parly Profile link."
+  }, { method: "POST", path: "/api/phase3/one-time-deposit" })
+  registerWebApiTool("create_invoice_one_time_address", {
+    title: "Create Invoice One-Time Address",
+    description: "Create a one-time payment address for a Parly invoice link."
+  }, { method: "POST", path: "/api/phase3/one-time-deposit" })
   registerWebApiTool("privacy_link_publish", {
     title: "Publish Privacy Link",
     description: "Publish profile or invoice metadata through the existing Privacy Links API."
@@ -689,10 +734,18 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
     title: "Create Receipt Download URL",
     description: "Create a short-lived private receipt download URL from a status access token."
   }, { method: "POST", path: "/api/phase3/receipt-download" })
+  registerWebApiTool("download_receipt_url", {
+    title: "Download Receipt URL",
+    description: "Create a short-lived private receipt download URL from a status access token."
+  }, { method: "POST", path: "/api/phase3/receipt-download" })
   registerWebApiTool("verify_invoice_receipt", {
     title: "Verify Invoice Receipt",
     description: "Verify a Privacy Invoice receipt token through the public Verify API."
   }, { method: "POST", path: "/api/verify/invoice" })
+  registerWebApiTool("verify_payout_scope", {
+    title: "Verify Payout Scope",
+    description: "Verify a Parly payout scope using a transaction hash and disclosed child key."
+  }, { method: "POST", path: "/api/verify/payout" })
   registerWebApiTool("ui_settings_read", {
     title: "Read Public UI Settings",
     description: "Read public presentation settings such as the TVL ticker state."
@@ -709,6 +762,38 @@ export function buildParlyMcpRuntime(env: NodeJS.ProcessEnv = process.env): Parl
     title: "Confirm Relayer Registration",
     description: "Confirm a relayer registration using the same signed API as /relayer."
   }, { method: "POST", path: "/api/relayers/register/confirm" })
+
+  registerTool(
+    "parse_batch_csv",
+    {
+      title: "Parse Batch CSV",
+      description: "Parse up to 10 same-chain private payment rows from CSV before sending.",
+      inputSchema: batchCsvSchema
+    },
+    async ({ csv }) => {
+      try {
+        const lines = csv
+          .split(/\r?\n/u)
+          .map((line: string) => line.trim())
+          .filter(Boolean)
+        const rows = (lines[0]?.toLowerCase().includes("destination") ? lines.slice(1) : lines).map((line: string, index: number) => {
+          const [destination = "", amount = "", asset = ""] = line.split(",").map((value: string) => value.trim())
+          if (!ADDRESS_RE.test(destination)) throw new Error(`Batch CSV row ${index + 1} has an invalid destination.`)
+          if (!/^\d+(\.\d{1,6})?$/u.test(amount) || Number(amount) <= 0) {
+            throw new Error(`Batch CSV row ${index + 1} has an invalid amount.`)
+          }
+          if (!/^(USDC|USDC\.e|USDT|USDT0)$/u.test(asset)) {
+            throw new Error(`Batch CSV row ${index + 1} has an unsupported asset.`)
+          }
+          return { destination, amount, asset }
+        })
+        if (rows.length < 1 || rows.length > 10) throw new Error("Batch CSV must contain 1 to 10 payment rows.")
+        return jsonToolResponse({ status: "ok", tool: "parse_batch_csv", rows })
+      } catch (error) {
+        return jsonToolError("parse_batch_csv", error)
+      }
+    }
+  )
   return {
     config,
     sdk,
